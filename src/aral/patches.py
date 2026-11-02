@@ -104,9 +104,40 @@ FIELDS = ("patch", "product_id", "gx", "gy", "col_off", "row_off",
 
 
 def write_index(records, out_path):
+    """Columns are the ones the records carry, in FIELDS order.
+
+    A fixed column list would write empty columns for keys a caller does not
+    produce, and those empty columns collide with ones computed downstream.
+    """
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    keys = list(records[0]) if records else list(FIELDS)
+    fields = [f for f in FIELDS if f in keys] + [k for k in keys if k not in FIELDS]
     with open(out_path, "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=FIELDS, extrasaction="ignore")
+        w = csv.DictWriter(fh, fieldnames=fields)
         w.writeheader()
         w.writerows(records)
     return out_path
+
+
+def cut(tile_path, out_dir, product_id=None, min_valid=None, limit=None):
+    """Old interface: scan, then write every candidate.
+
+    Kept so a notebook opened before the scan/extract split keeps working
+    when the code underneath it is refreshed. It is the slow path - reload
+    the notebook page to get the cells that write only the chosen patches.
+    """
+    print("patches.cut() writes every candidate; reload the notebook page "
+          "for the scan/extract cells that write only the chosen ones")
+    recs = scan(tile_path, product_id=product_id, min_valid=min_valid)
+    if limit:
+        recs = recs[:limit]
+    old = []
+    for rec, path in zip(recs, extract(tile_path, recs, out_dir)):
+        # Exactly the old record shape. The old selection cell scores the
+        # patches itself; handing it water_frac and mixedness as well makes
+        # its merge suffix both copies and lose the column it sorts on.
+        old.append({"patch": rec["patch"], "product_id": rec["product_id"],
+                    "gx": rec["gx"], "gy": rec["gy"],
+                    "valid_frac": rec["valid_frac"],
+                    "bytes": path.stat().st_size})
+    return old
