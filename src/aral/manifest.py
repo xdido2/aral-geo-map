@@ -7,6 +7,7 @@ the same parameters yields the same rows.
 """
 import csv
 import json
+import pathlib
 import time
 import urllib.error
 import urllib.request
@@ -22,7 +23,13 @@ FIELDS = ("product_id", "date", "year", "month", "path", "row",
           "platform", "tier", "cloud", "sun_elev", "epsg", "base_url")
 
 
-def _post(url, body, tries=5):
+def _post(url, body, tries=7):
+    """POST with a backoff that takes 429 seriously.
+
+    Shared outbound addresses - Colab's above all - get throttled far harder
+    than a home connection. Treating 429 like any other error turns a pause
+    into a failed run.
+    """
     for attempt in range(tries):
         try:
             req = urllib.request.Request(
@@ -30,10 +37,21 @@ def _post(url, body, tries=5):
                 headers={"Content-Type": "application/json"})
             with urllib.request.urlopen(req, timeout=120) as r:
                 return json.load(r)
-        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError):
+        except urllib.error.HTTPError as exc:
             if attempt == tries - 1:
                 raise
-            time.sleep(3 * (attempt + 1))
+            if exc.code == 429:
+                wait = float(exc.headers.get("Retry-After") or 0) or 10 * 2 ** attempt
+                print(f"    429, waiting {wait:.0f}s", flush=True)
+            elif exc.code in (500, 502, 503, 504):
+                wait = 5 * 2 ** attempt
+            else:
+                raise
+            time.sleep(min(wait, 300))
+        except (urllib.error.URLError, TimeoutError):
+            if attempt == tries - 1:
+                raise
+            time.sleep(5 * 2 ** attempt)
 
 
 def _search(path, year, season=None):
@@ -108,16 +126,38 @@ def matches_config(manifest_path, years=None, season=None):
     return all(got.get(k) == v for k, v in want.items())
 
 
-def build(out_path=None, years=None, season=None, verbose=True):
+def build(out_path=None, years=None, season=None, cache_dir=None,
+          verbose=True, pause=0.3):
+    """Search the catalogue cell by cell, caching each answer.
+
+    One shard per (path, year): a run that dies at request 100 of 126 resumes
+    from 100, not from zero. Without this a rate limit is not a delay but a
+    loop, because nothing is written until the very last query succeeds.
+    """
     out_path = out_path or (C.INTERIM / "manifest.csv")
     y0, y1 = years or C.YEARS
+    season = tuple(season or C.SEASON)
+    # Put the cache somewhere that outlives the machine - on Colab the VM
+    # disk goes away with the session, and a rate limit then costs the whole
+    # build a second time.
+    base = pathlib.Path(cache_dir) if cache_dir else out_path.parent
+    cache = base / f"{out_path.stem}_cache_{season[0]}{season[1]}"
+    cache.mkdir(parents=True, exist_ok=True)
+
     rows, seen = [], set()
     for year in range(y0, y1 + 1):
         n = 0
         for path in C.PATHS:
-            for feature in _search(path, year, season):
-                r = _row(feature)
-                if r and r["product_id"] not in seen:
+            shard = cache / f"{path}_{year}.json"
+            if shard.exists():
+                found = json.loads(shard.read_text())
+            else:
+                found = [r for r in (_row(f) for f in _search(path, year, season))
+                         if r]
+                shard.write_text(json.dumps(found))
+                time.sleep(pause)          # be a good neighbour on a shared IP
+            for r in found:
+                if r["product_id"] not in seen:
                     seen.add(r["product_id"])
                     rows.append(r)
                     n += 1
