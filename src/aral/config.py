@@ -70,6 +70,10 @@ SEASON = (5, 9)
 STORE_SCALE = 10000
 STORE_NODATA = -32768
 MIN_VALID_FRACTION = 0.2           # skip patches that are mostly mask
+# Statistics are read through the overviews, not at full resolution: a median
+# over four million pixels is indistinguishable from one over fifty-five, and
+# the full read costs gigabytes of RAM per tile.
+QA_MAX_PIXELS = 4_000_000
 
 # --- band numbering ---------------------------------------------------------
 # The same physical band has a different number on different sensors. This

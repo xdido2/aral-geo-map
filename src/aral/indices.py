@@ -41,15 +41,36 @@ def bsi(bands):
 ALL = {"mndwi": mndwi, "ndvi": ndvi, "bsi": bsi}
 
 
-def read_bands(path):
-    """Prepared tile -> dict of masked reflectance arrays keyed by band name."""
+def read_bands(path, window=None, max_pixels=None):
+    """Prepared tile -> dict of masked reflectance arrays, by band name.
+
+    `max_pixels` caps the read: anything larger is decimated through the
+    tile's averaged overviews. Reading a whole scene-sized tile at full
+    resolution as float32 costs several gigabytes - enough to end a Colab
+    session - and buys nothing when the answer is a median.
+    """
     import rasterio
+    from rasterio.enums import Resampling
+
     with rasterio.open(path) as src:
-        data = src.read(masked=True).astype(np.float32) / C.STORE_SCALE
+        h = int(window.height) if window is not None else src.height
+        w = int(window.width) if window is not None else src.width
+        kwargs = {"masked": True, "window": window}
+        if max_pixels and h * w > max_pixels:
+            shrink = (h * w / max_pixels) ** 0.5
+            kwargs["out_shape"] = (src.count,
+                                   max(int(h / shrink), 1),
+                                   max(int(w / shrink), 1))
+            kwargs["resampling"] = Resampling.average
+        data = src.read(**kwargs)
         names = src.descriptions
+    # Convert in place: `.astype(...) / scale` would leave two full copies
+    # of the array alive at once.
+    data = data.astype(np.float32)
+    data /= C.STORE_SCALE
     return {name: data[i] for i, name in enumerate(names)}
 
 
-def compute(path, which=None):
-    bands = read_bands(path)
+def compute(path, which=None, window=None, max_pixels=None):
+    bands = read_bands(path, window=window, max_pixels=max_pixels)
     return {k: ALL[k](bands) for k in (which or C.INDICES)}

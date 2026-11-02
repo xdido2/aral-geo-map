@@ -16,9 +16,14 @@ FIELDS = ("product_id", "path", "row", "date", "width", "height",
           "mndwi_median", "ndvi_median", "bsi_median", "water_frac")
 
 
-def tile_stats(tile_path, meta=None):
-    """Numbers that make a bad tile stand out when the table is sorted."""
-    idx = indices.compute(tile_path)
+def tile_stats(tile_path, meta=None, max_pixels=None):
+    """Numbers that make a bad tile stand out when the table is sorted.
+
+    Read through the overviews: these are summary statistics, and a tile the
+    size of a Landsat scene does not fit in memory as float32.
+    """
+    idx = indices.compute(tile_path,
+                          max_pixels=max_pixels or C.QA_MAX_PIXELS)
     water = idx["mndwi"] > 0
     row = dict(meta or {})
     row.update({
