@@ -12,7 +12,7 @@ from . import config as C
 from . import indices
 
 FIELDS = ("product_id", "path", "row", "date", "width", "height",
-          "valid_frac", "qa_reject_frac",
+          "valid_frac", "clear_frac", "qa_reject_frac",
           "mndwi_median", "ndvi_median", "bsi_median", "water_frac")
 
 
@@ -48,7 +48,10 @@ def write(rows, out_path=None):
 def flag(row):
     """Cheap anomaly rules. Not a model - just the things that are never fine."""
     out = []
-    if row.get("valid_frac", 1) < C.MIN_VALID_FRACTION:
+    # Judge the sky, not the geometry: a third of every tile is the empty
+    # corners of a rotated scene, whatever the weather.
+    clear = row.get("clear_frac")
+    if (clear if clear is not None else row.get("valid_frac", 1)) < C.MIN_VALID_FRACTION:
         out.append("mostly-masked")
     if row.get("water_frac") in (0.0, 1.0):
         out.append("uniform-water-fraction")

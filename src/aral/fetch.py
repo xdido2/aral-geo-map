@@ -87,7 +87,7 @@ def _download_window(url, dest):
 def fetch_asset(row, key, root, mode="window", tries=4):
     dest = scene_dir(root, row) / C.asset_filename(row["product_id"], key)
     if dest.exists() and dest.stat().st_size > 0:
-        return ("have", dest, dest.stat().st_size)
+        return ("have", dest, dest.stat().st_size, 0)
     dest.parent.mkdir(parents=True, exist_ok=True)
     # Only rasters can be windowed; metadata is always copied whole.
     how = _download_whole if (mode == "full" or dest.suffix != ".TIF") \
@@ -96,10 +96,10 @@ def fetch_asset(row, key, root, mode="window", tries=4):
         try:
             url = pc.asset_url(row["base_url"], row["product_id"], key)
             n = how(url, dest)
-            return ("ok", dest, n)
+            return ("ok", dest, n, attempt)
         except Exception as exc:
             if attempt == tries - 1:
-                return ("fail", dest, repr(exc))
+                return ("fail", dest, repr(exc), attempt)
             time.sleep(3 * 2 ** attempt)
 
 
@@ -108,14 +108,17 @@ def fetch(rows, root=None, mode="window", workers=8, assets=ASSETS,
     """Fetch every asset of every manifest row. Safe to re-run."""
     root = root or (C.RAW / "landsat")
     jobs = [(r, k) for r in rows for k in assets]
-    done = {"ok": 0, "have": 0, "fail": 0}
+    # Retries back off for seconds each and used to be invisible: a slow run
+    # looked slow for no reason. Counting them names the reason.
+    done = {"ok": 0, "have": 0, "fail": 0, "retried": 0}
     nbytes = 0
     t0 = time.time()
     with ThreadPoolExecutor(max_workers=workers) as ex:
         futures = {ex.submit(fetch_asset, r, k, root, mode): (r, k) for r, k in jobs}
         for i, fut in enumerate(as_completed(futures), 1):
-            status, dest, info = fut.result()
+            status, dest, info, retries = fut.result()
             done[status] += 1
+            done["retried"] += retries > 0
             if status == "ok":
                 nbytes += info
             elif status == "fail":

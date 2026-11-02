@@ -58,6 +58,13 @@ def read_bands(path, window=None, max_pixels=None):
         kwargs = {"masked": True, "window": window}
         if max_pixels and h * w > max_pixels:
             shrink = (h * w / max_pixels) ** 0.5
+            # GDAL serves a read from an overview only if that level's factor
+            # is no larger than the shrink asked for. Ask for less than the
+            # finest level and it silently decodes the full resolution
+            # instead - two orders of magnitude slower for the same median.
+            levels = src.overviews(1)
+            if levels and shrink < min(levels):
+                shrink = float(min(levels))
             kwargs["out_shape"] = (src.count,
                                    max(int(h / shrink), 1),
                                    max(int(w / shrink), 1))

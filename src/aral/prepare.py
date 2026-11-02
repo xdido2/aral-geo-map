@@ -76,6 +76,17 @@ def _on_grid(path, transform, width, height):
         return vrt.read(1)
 
 
+def _clear(valid, fill):
+    """Valid share of the pixels the scene actually covers.
+
+    valid_frac counts the rotated scene's empty corners as losses - about a
+    third of the tile - so a cloudless scene would score ~0.7. This one
+    measures the sky, which is what a quality ranking needs.
+    """
+    inside = int((~fill).sum())
+    return float(valid.sum()) / inside if inside else 0.0
+
+
 def tile_stats_from_file(tile_path):
     """Quality fractions of an existing tile: from its tags, else measured.
 
@@ -88,6 +99,8 @@ def tile_stats_from_file(tile_path):
             return {"product_id": tags.get("product_id", tile_path.stem),
                     "width": src.width, "height": src.height,
                     "valid_frac": round(float(tags["valid_frac"]), 4),
+                    "clear_frac": (round(float(tags["clear_frac"]), 4)
+                                   if "clear_frac" in tags else None),
                     "qa_reject_frac": round(float(tags["qa_reject_frac"]), 4)}
         valid = None
         for i in range(1, src.count + 1):
@@ -96,6 +109,7 @@ def tile_stats_from_file(tile_path):
         return {"product_id": tile_path.stem,
                 "width": src.width, "height": src.height,
                 "valid_frac": round(float(valid.mean()), 4),
+                "clear_frac": None,
                 "qa_reject_frac": None}
 
 
@@ -113,6 +127,7 @@ def prepare(scene_dir, product_id, out_path, window=None):
     qa = _on_grid(scene_dir / C.asset_filename(product_id, C.QA_ASSET),
                   transform, width, height)
     rejected = qa_reject(qa)
+    fill = (qa & (1 << C.QA_FILL)) != 0
     valid = ~rejected
     for key in C.BANDS:                       # fill (0) is below lo, so the
         dn = _on_grid(scene_dir / C.asset_filename(product_id, key),
@@ -153,7 +168,8 @@ def prepare(scene_dir, product_id, out_path, window=None):
         # Carried in the file, so a skipped tile can still report its own
         # quality. Recomputing it later means re-reading every band; losing
         # it means the QA table has a hole exactly where it matters.
-        dst.update_tags(valid_frac=f"{valid.mean():.6f}",
+        dst.update_tags(clear_frac=f"{_clear(valid, fill):.6f}",
+                        valid_frac=f"{valid.mean():.6f}",
                         qa_reject_frac=f"{rejected.mean():.6f}",
                         product_id=product_id)
 
@@ -162,6 +178,7 @@ def prepare(scene_dir, product_id, out_path, window=None):
         "product_id": product_id,
         "width": width, "height": height,
         "valid_frac": round(float(valid.sum()) / total, 4),
+        "clear_frac": round(_clear(valid, fill), 4),
         "qa_reject_frac": round(float(rejected.sum()) / total, 4),
         "out_bytes": out_path.stat().st_size,
     }
