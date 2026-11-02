@@ -1,13 +1,15 @@
 .venv/
 __pycache__/
 *.pyc
+.mypy_cache/
 
 # Reproducible from the manifest - never commit, never back up.
 data/raw/
-data/interim/
 data/work/
 dist/
 
-# Keep: the manifest defines the dataset, the reports are the evidence.
+# Note the trailing /*: excluding the directory itself would make the
+# negation below unreachable, because git never descends into an
+# excluded directory.
+data/interim/*
 !data/interim/manifest*.csv
-.mypy_cache/
