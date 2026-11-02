@@ -24,6 +24,9 @@ from . import config as C
 from . import grid
 
 
+OVERVIEWS = [8, 32]
+
+
 def read_scaling(scene_dir, product_id):
     """Scale and offset from the scene's own metadata, not from a constant.
 
@@ -101,7 +104,8 @@ def prepare(scene_dir, product_id, out_path, window=None):
                    transform=transform, nodata=C.STORE_NODATA,
                    tiled=True, blockxsize=256, blockysize=256,
                    compress="deflate", predictor=2)
-    with rasterio.open(out_path, "w", **profile) as dst:
+    with rasterio.Env(GDAL_NUM_THREADS="ALL_CPUS"), \
+            rasterio.open(out_path, "w", **profile) as dst:
         for i, key in enumerate(C.BANDS, start=1):
             dn = _on_grid(scene_dir / C.asset_filename(product_id, key),
                           transform, width, height)
@@ -113,11 +117,15 @@ def prepare(scene_dir, product_id, out_path, window=None):
             dst.set_band_description(i, key)
             del dn, refl, band
 
-        # Overviews are averaged, so a zoomed-out view reports the real mix of
-        # a block instead of whichever single pixel decimation happened to
+        # Overviews are averaged, so a zoomed-out view reports the real mix
+        # of a block instead of whichever single pixel decimation happened to
         # land on. Without them, periodic gaps (Landsat 7 after the 2003 SLC
         # failure above all) alias into a pattern that is not in the data.
-        dst.build_overviews([2, 4, 8, 16, 32], Resampling.average)
+        #
+        # Only two levels. A preview shrinks a scene about elevenfold, so
+        # level 2 is never displayed - but it holds a quarter of the full
+        # image, costing most of the build time and half the file growth.
+        dst.build_overviews(OVERVIEWS, Resampling.average)
         dst.update_tags(ns="rio_overview", resampling="average")
 
     total = valid.size
