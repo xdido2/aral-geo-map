@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Reproducible from the manifest - never commit, never back up.
+data/raw/
+data/interim/
+data/work/
+dist/
+
+# Keep: the manifest defines the dataset, the reports are the evidence.
+!data/interim/manifest*.csv
+.mypy_cache/
