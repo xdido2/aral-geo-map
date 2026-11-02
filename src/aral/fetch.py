@@ -32,7 +32,10 @@ GDAL_ENV = dict(
     VSI_CACHE_SIZE="33554432",
 )
 
-ASSETS = C.BANDS + (C.QA_ASSET,)
+# MTL is not optional: `prepare` reads the reflectance scaling out of it and
+# refuses to run without it. Leaving it out here is what makes stage 3 fail
+# halfway through a batch rather than at the start.
+ASSETS = C.BANDS + (C.QA_ASSET, C.MTL_ASSET)
 
 
 def scene_dir(root, row):
@@ -86,10 +89,13 @@ def fetch_asset(row, key, root, mode="window", tries=4):
     if dest.exists() and dest.stat().st_size > 0:
         return ("have", dest, dest.stat().st_size)
     dest.parent.mkdir(parents=True, exist_ok=True)
+    # Only rasters can be windowed; metadata is always copied whole.
+    how = _download_whole if (mode == "full" or dest.suffix != ".TIF") \
+        else _download_window
     for attempt in range(tries):
         try:
             url = pc.asset_url(row["base_url"], row["product_id"], key)
-            n = (_download_whole if mode == "full" else _download_window)(url, dest)
+            n = how(url, dest)
             return ("ok", dest, n)
         except Exception as exc:
             if attempt == tries - 1:

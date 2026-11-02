@@ -49,6 +49,7 @@ PC_SIGN = "https://planetarycomputer.microsoft.com/api/sas/v1/sign?href="
 # these names hide that difference and must be used instead of B1..B7.
 BANDS = ("blue", "green", "red", "nir08", "swir16", "swir22")
 QA_ASSET = "qa_pixel"
+MTL_ASSET = "mtl.json"             # carries the reflectance scaling
 INDICES = ("mndwi", "ndvi", "bsi")
 
 # --- selection rules --------------------------------------------------------
@@ -89,6 +90,8 @@ SENSOR = {"LT04": "TM", "LT05": "TM", "LE07": "ETM", "LC08": "OLI", "LC09": "OLI
 
 def asset_filename(product_id: str, key: str) -> str:
     """Filename of one asset of one scene, e.g. ..._SR_B5.TIF."""
+    if key == MTL_ASSET:
+        return f"{product_id}_MTL.json"
     if key == QA_ASSET:
         return f"{product_id}_QA_PIXEL.TIF"
     sensor = SENSOR[product_id[:4]]

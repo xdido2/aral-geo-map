@@ -82,6 +82,32 @@ def _row(feature):
     }
 
 
+def params_path(manifest_path):
+    return manifest_path.with_suffix(".json")
+
+
+def params(manifest_path):
+    """Build parameters of an existing manifest, or None if unknown."""
+    p = params_path(manifest_path)
+    return json.loads(p.read_text()) if p.exists() else None
+
+
+def matches_config(manifest_path, years=None, season=None):
+    """Was this manifest built with the parameters in force now?
+
+    A manifest that silently disagrees with the config defines a different
+    dataset than the code thinks it does - the kind of mismatch that only
+    shows up as a missing file three stages later.
+    """
+    got = params(manifest_path)
+    if not got:
+        return False
+    want = {"season": list(season or C.SEASON), "years": list(years or C.YEARS),
+            "paths": list(C.PATHS), "rows": list(C.ROWS),
+            "collection": C.PC_COLLECTION}
+    return all(got.get(k) == v for k, v in want.items())
+
+
 def build(out_path=None, years=None, season=None, verbose=True):
     out_path = out_path or (C.INTERIM / "manifest.csv")
     y0, y1 = years or C.YEARS
@@ -100,6 +126,16 @@ def build(out_path=None, years=None, season=None, verbose=True):
 
     rows.sort(key=lambda r: (r["date"], r["path"], r["row"]))
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    params_path(out_path).write_text(json.dumps({
+        "season": list(season or C.SEASON),
+        "years": list(years or C.YEARS),
+        "paths": list(C.PATHS),
+        "rows": list(C.ROWS),
+        "collection": C.PC_COLLECTION,
+        "aoi_bbox": list(C.AOI_BBOX),
+        "n_rows": len(rows),
+        "built_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }, indent=2))
     with open(out_path, "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=FIELDS)
         w.writeheader()
