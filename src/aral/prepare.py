@@ -76,6 +76,29 @@ def _on_grid(path, transform, width, height):
         return vrt.read(1)
 
 
+def tile_stats_from_file(tile_path):
+    """Quality fractions of an existing tile: from its tags, else measured.
+
+    Measuring reads one band at a time - a whole tile as one array is
+    several gigabytes.
+    """
+    with rasterio.open(tile_path) as src:
+        tags = src.tags()
+        if "valid_frac" in tags:
+            return {"product_id": tags.get("product_id", tile_path.stem),
+                    "width": src.width, "height": src.height,
+                    "valid_frac": round(float(tags["valid_frac"]), 4),
+                    "qa_reject_frac": round(float(tags["qa_reject_frac"]), 4)}
+        valid = None
+        for i in range(1, src.count + 1):
+            m = src.read_masks(i) > 0
+            valid = m if valid is None else (valid & m)
+        return {"product_id": tile_path.stem,
+                "width": src.width, "height": src.height,
+                "valid_frac": round(float(valid.mean()), 4),
+                "qa_reject_frac": None}
+
+
 def prepare(scene_dir, product_id, out_path, window=None):
     """Write the scene as int16 reflectance on the grid. Returns QA stats."""
     scene_dir = Path(scene_dir)
@@ -127,6 +150,12 @@ def prepare(scene_dir, product_id, out_path, window=None):
         # image, costing most of the build time and half the file growth.
         dst.build_overviews(OVERVIEWS, Resampling.average)
         dst.update_tags(ns="rio_overview", resampling="average")
+        # Carried in the file, so a skipped tile can still report its own
+        # quality. Recomputing it later means re-reading every band; losing
+        # it means the QA table has a hole exactly where it matters.
+        dst.update_tags(valid_frac=f"{valid.mean():.6f}",
+                        qa_reject_frac=f"{rejected.mean():.6f}",
+                        product_id=product_id)
 
     total = valid.size
     return {

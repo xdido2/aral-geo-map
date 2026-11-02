@@ -74,6 +74,10 @@ MIN_VALID_FRACTION = 0.2           # skip patches that are mostly mask
 # over four million pixels is indistinguishable from one over fifty-five, and
 # the full read costs gigabytes of RAM per tile.
 QA_MAX_PIXELS = 4_000_000
+# Patches offered for hand labelling must be near-complete. Landsat 7 after
+# 2003 is shot through with gaps; drawing boundaries across them is slow and
+# teaches the model a hole that is not in the ground.
+LABEL_MIN_VALID = 0.95
 
 # --- band numbering ---------------------------------------------------------
 # The same physical band has a different number on different sensors. This
