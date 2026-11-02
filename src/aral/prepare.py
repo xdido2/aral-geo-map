@@ -113,6 +113,13 @@ def prepare(scene_dir, product_id, out_path, window=None):
             dst.set_band_description(i, key)
             del dn, refl, band
 
+        # Overviews are averaged, so a zoomed-out view reports the real mix of
+        # a block instead of whichever single pixel decimation happened to
+        # land on. Without them, periodic gaps (Landsat 7 after the 2003 SLC
+        # failure above all) alias into a pattern that is not in the data.
+        dst.build_overviews([2, 4, 8, 16, 32], Resampling.average)
+        dst.update_tags(ns="rio_overview", resampling="average")
+
     total = valid.size
     return {
         "product_id": product_id,
