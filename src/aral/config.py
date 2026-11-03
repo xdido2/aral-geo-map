@@ -118,3 +118,23 @@ def asset_filename(product_id: str, key: str) -> str:
         return f"{product_id}_QA_PIXEL.TIF"
     sensor = SENSOR[product_id[:4]]
     return f"{product_id}_SR_{BAND_FILE[sensor][key]}.TIF"
+
+
+# --- classes and labels -------------------------------------------------------
+# Training ids. A published mask stores id + 1, keeping 0 for "no data".
+CLASS_NAMES = ("water", "salt", "bare_soil", "vegetation")
+IGNORE_INDEX = 255                 # no data: excluded from loss and metrics
+
+# Thresholds for the automatic (weak) labels. The water one sits in a real gap
+# between the classes. The salt one does not: bare-ground SWIR1 reflectance
+# is continuous from ~0.15 to ~0.99 with no break, so 0.42 is a placeholder
+# that hand labels are meant to replace, not a finding.
+WEAK_WATER_MNDWI = 0.0
+WEAK_VEG_NDVI = 0.20
+WEAK_SALT_SWIR16 = 0.42
+
+# Per-band normalisation for model input, in stored units (reflectance x
+# 10000). Taken from Prithvi-EO-2.0's config, whose HLS training data uses the
+# same scale; reused for every model so their inputs are identical.
+MODEL_MEAN = (1087.0, 1342.0, 1433.0, 2734.0, 1958.0, 1363.0)
+MODEL_STD = (2248.0, 2179.0, 2178.0, 1850.0, 1242.0, 1049.0)

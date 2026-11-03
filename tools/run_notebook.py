@@ -9,6 +9,11 @@ Run before every push that touches src/ or the notebook:
 Downloads two 2019 scenes (~600 MB) into <work>. A manifest left in
 <work>/drive from an earlier run is reused, otherwise it is rebuilt (~6 min).
 
+Settings can be overridden for a quick CPU run, e.g. for aral_train.ipynb:
+
+    ... run_notebook.py notebooks/aral_train.ipynb <work> \
+        --set INSTALL=False --set MAX_PATCHES=40 --set EPOCHS_UNET=1
+
 google.colab is stubbed, /content paths are redirected into a scratch
 directory, and the code arrives through the zip path so the test covers
 the working tree about to be pushed. Stops at the first failing cell.
@@ -16,6 +21,13 @@ the working tree about to be pushed. Stops at the first failing cell.
 import json, os, pathlib, sys, time, traceback, types
 
 nb_path, work = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+overrides = {}
+args = sys.argv[3:]
+while args:
+    flag, pair, *args = args
+    assert flag == "--set", f"unknown argument {flag}"
+    name, value = pair.split("=", 1)
+    overrides[name] = value
 os.environ["MPLBACKEND"] = "Agg"
 drive_dir, root_dir, mount_dir = work / "drive", work / "root", work / "mount"
 for d in (drive_dir, mount_dir):
@@ -43,6 +55,9 @@ for i, src in enumerate(cells, 1):
               .replace("/content/drive", str(mount_dir)))
     if src.startswith("REPO_URL"):
         src = "REPO_URL = ''" + src[src.index("\n"):]
+    for name, value in overrides.items():
+        src = "\n".join(f"{name} = {value}" if l.startswith(f"{name} =") else l
+                        for l in src.split("\n"))
     if "CELLS = " in src:
         src += "\n" + SUBSET
     head = src.strip().split("\n")[0][:70]
