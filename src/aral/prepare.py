@@ -122,6 +122,7 @@ def prepare(scene_dir, product_id, out_path, window=None):
         return None
     transform, width, height = geom
     lo, hi = C.SR_VALID
+    slack = int(round(C.SR_CLAMP_TOL / C.SR_SCALE))
 
     # pass 1 - validity, from raw DN and QA only
     qa = _on_grid(scene_dir / C.asset_filename(product_id, C.QA_ASSET),
@@ -129,10 +130,10 @@ def prepare(scene_dir, product_id, out_path, window=None):
     rejected = qa_reject(qa)
     fill = (qa & (1 << C.QA_FILL)) != 0
     valid = ~rejected
-    for key in C.BANDS:                       # fill (0) is below lo, so the
+    for key in C.BANDS:                       # fill (0) is far below lo, so
         dn = _on_grid(scene_dir / C.asset_filename(product_id, key),
                       transform, width, height)
-        valid &= (dn >= lo) & (dn <= hi)      # range check catches it too
+        valid &= (dn >= lo - slack) & (dn <= hi + slack)
         del dn
 
     # pass 2 - convert and write, one band at a time
@@ -147,6 +148,7 @@ def prepare(scene_dir, product_id, out_path, window=None):
         for i, key in enumerate(C.BANDS, start=1):
             dn = _on_grid(scene_dir / C.asset_filename(product_id, key),
                           transform, width, height)
+            np.clip(dn, lo, hi, out=dn)       # the slack, pulled back in
             refl = dn.astype(np.float32) * scale + offset
             band = np.full(refl.shape, C.STORE_NODATA, dtype=np.int16)
             np.rint(refl * C.STORE_SCALE, out=refl)

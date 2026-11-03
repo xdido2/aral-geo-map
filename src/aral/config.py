@@ -32,7 +32,13 @@ AREA_CRS = ("+proj=aea +lat_1=43 +lat_2=47 +lat_0=45 +lon_0=60 "
 # --- Landsat Collection 2 Level-2 -------------------------------------------
 SR_SCALE = 2.75e-05                # DN -> surface reflectance
 SR_OFFSET = -0.2
-SR_VALID = (7273, 43636)           # anything outside is not a measurement
+SR_VALID = (7273, 43636)           # the range USGS calls valid
+# Water reflects almost nothing in SWIR, and atmospheric correction routinely
+# overshoots by a fraction of a percent, so a genuine open-water pixel lands
+# just below zero. Treating that as invalid punches single-pixel holes through
+# the one class the project cares about most. Small excursions are clamped to
+# the limit; only larger ones are rejected.
+SR_CLAMP_TOL = 0.02                # reflectance units
 
 # QA_PIXEL bit flags (Collection 2, all sensors)
 QA_FILL, QA_DILATED, QA_CIRRUS, QA_CLOUD, QA_SHADOW = 0, 1, 2, 3, 4
