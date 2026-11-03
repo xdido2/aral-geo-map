@@ -42,6 +42,14 @@ SR_CLAMP_TOL = 0.02                # reflectance units
 
 # QA_PIXEL bit flags (Collection 2, all sensors)
 QA_FILL, QA_DILATED, QA_CIRRUS, QA_CLOUD, QA_SHADOW = 0, 1, 2, 3, 4
+# CFMask's flags are used as they are, although along shorelines it over-flags:
+# on some clear dates a coastal strip a few hundred metres wide is marked
+# cloud, buffer or shadow (2019, cell 161/028: 9-21x the rate away from the
+# coast, up to a fifth of the shoreline on a 1%-cloud day). A thermal test -
+# "a cloud must be colder than open water" - cleared that strip on 1985-07-28
+# but, checked across dates, also released real thin clouds over the dried
+# seabed in May 2019. Not adopted. The strip is absent on other dates, so the
+# seasonal composite is what fills it; years with a single date keep it.
 QA_REJECT_BITS = (QA_FILL, QA_DILATED, QA_CIRRUS, QA_CLOUD, QA_SHADOW)
 
 # --- catalogues -------------------------------------------------------------
