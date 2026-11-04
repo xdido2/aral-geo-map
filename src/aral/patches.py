@@ -1,11 +1,11 @@
-"""Stage 4: prepared tile -> patches on the fixed grid.
+"""Stage 4: cut a prepared tile into patches on the fixed grid.
 
 Patches are addressed by their position on the global grid, so a patch keeps
 its name across dates and sensors. That is what makes a multi-temporal stack
 possible at all: patch (31, 44) is the same 7.68 km square in every year.
 
-Scanning and writing are separate on purpose. A single date offers tens of
-thousands of candidate patches and only a few hundred are worth labelling;
+Scanning and writing are deliberately separate. One date offers tens of
+thousands of candidate patches and only a few hundred are worth labelling, so
 writing them all first would spend almost all of its time on files that are
 about to be deleted.
 """
@@ -22,7 +22,7 @@ BAND_INDEX = {name: i + 1 for i, name in enumerate(C.BANDS)}
 
 
 def windows(src):
-    """Grid-aligned patch windows fully inside the tile."""
+    """Grid-aligned patch windows that fall entirely inside the tile."""
     x0, y0 = grid.origin()
     off_c = int(round((src.transform.c - x0) / C.PIXEL)) % C.PATCH
     off_r = int(round((y0 - src.transform.f) / C.PIXEL)) % C.PATCH
@@ -36,8 +36,8 @@ def windows(src):
 def scan(tile_path, product_id=None, min_valid=None):
     """Judge every candidate patch without writing anything.
 
-    MNDWI is a ratio, so the stored scale factor cancels: water can be told
-    from land on the raw int16 values, with no conversion to reflectance.
+    MNDWI is a ratio, so the stored scale factor cancels out and water can be
+    told from land on the raw int16 values, with no conversion to reflectance.
     """
     min_valid = C.MIN_VALID_FRACTION if min_valid is None else min_valid
     product_id = product_id or tile_path.stem
@@ -63,8 +63,8 @@ def scan(tile_path, product_id=None, min_valid=None):
                 "col_off": int(win.col_off), "row_off": int(win.row_off),
                 "valid_frac": round(frac, 4),
                 "water_frac": round(water, 4),
-                # 1 at a 50/50 split, 0 at all-water or all-land: the
-                # boundary is the part of a label worth drawing by hand.
+                # 1 at a 50/50 split and 0 at all water or all land. The
+                # shoreline is the part of a label worth drawing by hand.
                 "mixedness": round(1 - abs(2 * water - 1), 4),
             })
     return out
@@ -86,8 +86,8 @@ def extract(tile_path, records, out_dir):
                 width=C.PATCH, height=C.PATCH,
                 transform=src.window_transform(win),
                 compress="deflate", predictor=2)
-            # A 256x256 image is a single block; leaving the parent's block
-            # keys in place with tiled=False is what GDAL complains about.
+            # A 256x256 image is a single block. Keeping the parent's block
+            # settings with tiled=False is what makes GDAL complain.
             profile.update(tiled=True, blockxsize=C.PATCH, blockysize=C.PATCH)
             profile.pop("BIGTIFF", None)
             with rasterio.open(dest, "w", **profile) as dst:
@@ -104,10 +104,10 @@ FIELDS = ("patch", "product_id", "gx", "gy", "col_off", "row_off",
 
 
 def write_index(records, out_path):
-    """Columns are the ones the records carry, in FIELDS order.
+    """Write the patch index, using the columns the records actually carry.
 
-    A fixed column list would write empty columns for keys a caller does not
-    produce, and those empty columns collide with ones computed downstream.
+    A fixed column list would write empty columns for keys a caller never
+    produced, and those empty columns then collide with ones computed later.
     """
     out_path.parent.mkdir(parents=True, exist_ok=True)
     keys = list(records[0]) if records else list(FIELDS)
@@ -122,8 +122,8 @@ def write_index(records, out_path):
 def cut(tile_path, out_dir, product_id=None, min_valid=None, limit=None):
     """Old interface: scan, then write every candidate.
 
-    Kept so a notebook opened before the scan/extract split keeps working
-    when the code underneath it is refreshed. It is the slow path - reload
+    Kept so that a notebook opened before the scan/extract split still works
+    when the code underneath it is refreshed. This is the slow path. Reload
     the notebook page to get the cells that write only the chosen patches.
     """
     print("patches.cut() writes every candidate; reload the notebook page "
@@ -134,8 +134,8 @@ def cut(tile_path, out_dir, product_id=None, min_valid=None, limit=None):
     old = []
     for rec, path in zip(recs, extract(tile_path, recs, out_dir)):
         # Exactly the old record shape. The old selection cell scores the
-        # patches itself; handing it water_frac and mixedness as well makes
-        # its merge suffix both copies and lose the column it sorts on.
+        # patches itself, and handing it water_frac and mixedness as well
+        # makes its merge suffix both copies and lose the sort column.
         old.append({"patch": rec["patch"], "product_id": rec["product_id"],
                     "gx": rec["gx"], "gy": rec["gy"],
                     "valid_frac": rec["valid_frac"],

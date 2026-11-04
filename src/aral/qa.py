@@ -1,8 +1,8 @@
-"""Quality control: one row per tile, so 1400 tiles can be scanned at once.
+"""Quality control: one row per tile, so 1400 tiles can be checked at once.
 
-Every check here exists because the same mistake was made by hand first:
-a tile from the wrong cell, a tile that is mostly nodata, a tile whose
-statistics sit far from its neighbours in the same cell.
+Every rule here exists because I made the same mistake by hand first: a tile
+from the wrong cell, a tile that is mostly nodata, a tile whose statistics sit
+far away from its neighbours in the same cell.
 """
 import csv
 
@@ -17,7 +17,7 @@ FIELDS = ("product_id", "path", "row", "date", "width", "height",
 
 
 def tile_stats(tile_path, meta=None, max_pixels=None):
-    """Numbers that make a bad tile stand out when the table is sorted.
+    """Numbers that make a bad tile stand out once the table is sorted.
 
     Read through the overviews: these are summary statistics, and a tile the
     size of a Landsat scene does not fit in memory as float32.
@@ -46,10 +46,10 @@ def write(rows, out_path=None):
 
 
 def flag(row):
-    """Cheap anomaly rules. Not a model - just the things that are never fine."""
+    """Cheap anomaly rules. Not a model, just the things that are never fine."""
     out = []
-    # Judge the sky, not the geometry: a third of every tile is the empty
-    # corners of a rotated scene, whatever the weather.
+    # Judge the sky, not the geometry. A third of every tile is the empty
+    # corners of a rotated scene, whatever the weather was that day.
     clear = row.get("clear_frac")
     if (clear if clear is not None else row.get("valid_frac", 1)) < C.MIN_VALID_FRACTION:
         out.append("mostly-masked")

@@ -1,4 +1,5 @@
-# Bump whenever the notebook's cells and this package must change together.
-# Colab never refreshes an open notebook page from GitHub, so cell 2 compares
-# this against its own copy and says so, instead of failing three cells later.
+# Version marker shared with the notebooks. Colab does not refresh an open
+# notebook page when the code is pulled again, so cell 2 compares its own copy
+# of this number against the one here and asks you to reload the page.
+# Bump it when a change needs both new code and new cells.
 NOTEBOOK_REV = 2

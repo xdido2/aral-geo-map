@@ -2,8 +2,8 @@
 
 These are the threshold's opinion of each pixel, not the truth. A model
 trained on them learns to reproduce the threshold, mistakes included. That is
-enough to prove the training loop works and not enough to ask whether a model
-beats the threshold - that question needs the hand-drawn labels.
+enough to show the training loop works, and not enough to ask whether a model
+beats the threshold. That question needs the hand-drawn labels.
 """
 import numpy as np
 import rasterio
@@ -14,7 +14,7 @@ WATER, SALT, SOIL, VEG = range(4)
 
 
 def read_patch(path):
-    """Stored int16 bands (reflectance x 10000) and a validity mask."""
+    """Stored int16 bands (reflectance times 10000) and a validity mask."""
     with rasterio.open(path) as src:
         data = src.read()
     valid = (data != C.STORE_NODATA).all(axis=0)
@@ -22,7 +22,10 @@ def read_patch(path):
 
 
 def weak_labels(data, valid):
-    """Threshold labels for one patch, in training ids; IGNORE_INDEX off-data."""
+    """Threshold labels for one patch, as training ids.
+
+    Pixels with no data get IGNORE_INDEX so they stay out of the loss.
+    """
     b = {name: data[i].astype(np.float32) for i, name in enumerate(C.BANDS)}
     with np.errstate(invalid="ignore", divide="ignore"):
         mndwi = (b["green"] - b["swir16"]) / (b["green"] + b["swir16"])
@@ -40,7 +43,7 @@ def weak_labels(data, valid):
 
 
 def normalise(data, valid):
-    """Model input: per-band standardised, zero where there is no data."""
+    """Model input: standardised per band, zero wherever there is no data."""
     mean = np.asarray(C.MODEL_MEAN, np.float32)[:, None, None]
     std = np.asarray(C.MODEL_STD, np.float32)[:, None, None]
     x = (data.astype(np.float32) - mean) / std

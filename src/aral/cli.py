@@ -1,7 +1,7 @@
-"""Entry point. Every stage is a subcommand, every stage is re-runnable.
+"""Command line entry point. One subcommand per stage, all re-runnable.
 
-Re-runnability is not a nicety: over 1400 scenes something always fails
-halfway, and a pipeline that cannot resume never reaches the end.
+Being able to re-run a stage is not a nicety here. Over 1400 scenes something
+always fails halfway, and a pipeline that cannot resume never reaches the end.
 """
 import argparse
 import csv
@@ -51,7 +51,7 @@ def cmd_fetch(args):
         rows = [r for r in rows if r["cloud"] and float(r["cloud"]) <= args.max_cloud]
     if args.year:
         rows = [r for r in rows if int(r["year"]) in args.year]
-    gb = len(rows) * len(fetch.ASSETS) * 44 / 1000      # ~44 MB per asset
+    gb = len(rows) * len(fetch.ASSETS) * 44 / 1000      # about 44 MB per asset
     print(f"{len(rows)} scenes, {len(rows) * len(fetch.ASSETS)} assets, "
           f"~{gb:.0f} GB in '{args.mode}' mode")
     if args.dry_run:

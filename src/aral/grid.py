@@ -1,6 +1,6 @@
 """The fixed analysis grid.
 
-Every scene, whatever its native UTM zone, is resampled onto this one grid.
+Every scene, whatever UTM zone it came in, is resampled onto this one grid.
 Grid lines fall on whole multiples of TILE_M from a fixed origin, so any two
 dates line up pixel for pixel and patch boundaries never drift.
 """
@@ -13,7 +13,7 @@ from . import config as C
 
 
 def aoi_bounds():
-    """AOI in TARGET_CRS metres."""
+    """The AOI in TARGET_CRS metres."""
     return transform_bounds("EPSG:4326", C.TARGET_CRS, *C.AOI_BBOX, densify_pts=21)
 
 
@@ -28,8 +28,8 @@ def origin():
 def snap(bounds):
     """Align arbitrary bounds to the grid, growing outwards.
 
-    Returns (transform, width, height). Growing outwards rather than rounding
-    keeps every source pixel inside the result.
+    Returns (transform, width, height). Growing outwards instead of rounding
+    to the nearest line keeps every source pixel inside the result.
     """
     x0, y0 = origin()
     left, bottom, right, top = bounds
@@ -43,7 +43,7 @@ def snap(bounds):
 
 
 def clip_to_aoi(bounds):
-    """Intersect bounds with the AOI; None if they do not overlap."""
+    """Intersect bounds with the AOI. Returns None if they do not overlap."""
     al, ab, ar, at = aoi_bounds()
     left, bottom, right, top = bounds
     out = (max(left, al), max(bottom, ab), min(right, ar), min(top, at))
@@ -69,8 +69,9 @@ def describe():
 def patch_index(transform, col_off=0, row_off=0):
     """Global patch coordinates of a window, counted from the grid origin.
 
-    Derived from the map position, never from the tile: the same ground gets
-    the same (gx, gy) in 1985 and in 2025, whatever scene it came from.
+    Computed from the map position and never from the tile, so the same
+    ground gets the same (gx, gy) in 1985 and in 2025, no matter which scene
+    it came from.
     """
     x0, y0 = origin()
     x = transform.c + col_off * C.PIXEL
