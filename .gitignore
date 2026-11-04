@@ -3,13 +3,15 @@ __pycache__/
 *.pyc
 .mypy_cache/
 
-# Reproducible from the manifest - never commit, never back up.
+# Downloaded and generated data. Anyone can rebuild it from the manifest,
+# so it does not belong in git.
 data/raw/
 data/work/
 dist/
 
-# Note the trailing /*: excluding the directory itself would make the
-# negation below unreachable, because git never descends into an
-# excluded directory.
+# Keep the manifests, drop the rest of data/interim.
+# The /* matters: without it git skips the whole directory and never sees
+# the line below.
 data/interim/*
 !data/interim/manifest*.csv
+ai-lab_docs/
