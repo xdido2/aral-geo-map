@@ -131,6 +131,18 @@ IGNORE_INDEX = 255                 # no data: left out of the loss and metrics
 # reflectance runs from about 0.15 to 0.99 with no break in the histogram, so
 # 0.42 is a placeholder for the hand labels to replace. It is not a result.
 WEAK_WATER_MNDWI = 0.0
+# Wet salt crust also has MNDWI > 0 (pore water darkens SWIR1), but its white
+# crystals stay bright in NIR, while open water absorbs NIR. So water must
+# also be dark in NIR; MNDWI > 0 with a bright NIR is wet salt. Turbid shallow
+# water near the shore can exceed this too: check the shoreline by eye.
+WEAK_WATER_NIR = 0.10
+# Except a sheet of water a few cm deep over a salt bed (spring flooding):
+# NIR passes through it and comes back bright off the salt, but SWIR1 is
+# absorbed by millimetres of water and drops to ~0. Standing water is water,
+# however shallow, as in JRC Global Surface Water. 0.035 is the valley of the
+# SWIR1 histogram of wet, NIR-bright pixels (two 2019 scenes); recheck it on
+# TM-era scenes.
+WEAK_WATER_FILM_SWIR16 = 0.035
 WEAK_VEG_NDVI = 0.20
 WEAK_SALT_SWIR16 = 0.42
 

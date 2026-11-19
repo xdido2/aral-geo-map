@@ -31,14 +31,22 @@ def weak_labels(data, valid):
         mndwi = (b["green"] - b["swir16"]) / (b["green"] + b["swir16"])
         ndvi = (b["nir08"] - b["red"]) / (b["nir08"] + b["red"])
     lab = np.full(valid.shape, C.IGNORE_INDEX, np.uint8)
-    water = valid & (mndwi > C.WEAK_WATER_MNDWI)
+    wet = valid & (mndwi > C.WEAK_WATER_MNDWI)
+    dark_nir = b["nir08"] < C.WEAK_WATER_NIR * C.STORE_SCALE
+    film = b["swir16"] < C.WEAK_WATER_FILM_SWIR16 * C.STORE_SCALE
+    water = wet & (dark_nir | film)
     veg = valid & ~water & (ndvi > C.WEAK_VEG_NDVI)
     bare = valid & ~water & ~veg
+    # wet but bright in NIR: wet salt crust. Its SWIR1 is dark, so the dry
+    # salt rule below would wrongly call it soil; it is assigned here instead.
+    wet_salt = bare & wet
+    dry = bare & ~wet
     salt_dn = C.WEAK_SALT_SWIR16 * C.STORE_SCALE
     lab[water] = WATER
     lab[veg] = VEG
-    lab[bare & (b["swir16"] > salt_dn)] = SALT
-    lab[bare & (b["swir16"] <= salt_dn)] = SOIL
+    lab[wet_salt] = SALT
+    lab[dry & (b["swir16"] > salt_dn)] = SALT
+    lab[dry & (b["swir16"] <= salt_dn)] = SOIL
     return lab
 
 
