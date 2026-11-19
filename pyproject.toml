@@ -8,3 +8,10 @@ dependencies = [
     "rasterio>=1.5.2",
     "shapely>=2.2.0",
 ]
+
+[project.optional-dependencies]
+train = [
+    "matplotlib>=3.11.2",
+    "segmentation-models-pytorch>=0.6.0",
+    "torch>=2.15.0",
+]
